@@ -30,6 +30,23 @@ def adjacency_matrix(lattice_basis, walk_dimension=None):
     return recentred_nodes_coordinates, nx.to_numpy_array(grid_graph)
 
 
+def generic_adjacency_matrix(graph_bounds, graph_dimension):
+    """
+        For a generic square planar lattice graph in a specified dimension over specified range compute the adjacency
+        matrix and output the mapping back to Z^n centred around the origin.
+    :param graph_bounds: bounds on the graph, int
+    :param graph_dimension: dimension of the graph, int
+    :return: - mapping back to Z^n centred around origin, ndarray
+             - adjacency matrix, ndarray
+    """
+    grid_graph = nx.grid_graph(dim=[2*graph_bounds + 1
+                                    for i in range(graph_dimension)])
+    return ([[node[index] - graph_bounds
+             for index in range(graph_dimension)]
+            for node in nx.nodes(grid_graph)],
+            nx.to_numpy_array(grid_graph))
+
+
 def adj_mat_1d(lattice_basis):
     """
          Given a lattice basis return a one dimensional quantum walk over one of the dimensions.

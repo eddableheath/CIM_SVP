@@ -10,17 +10,16 @@ from scipy.linalg import expm
 import graph_functions as gf
 
 
-def prop_comp(adjacency_matrix, propagation_time, hopping_amplitude):
+def prop_comp(adjacency_matrix, gamma):
     """
         Computing the propagator unitary matrix for the simulation, considering a fixed prop time and hopping amplitude.
     :param adjacency_matrix: adjacency matrix of the underlying graph
-    :param propagation_time: propagation time for each quantum step
-    :param hopping_amplitude: hopping amplitude per unit time for jumping from one node to a neighbouring node
+    :param gamma: combination of the hopping amplitude and the propagation time, i.e. the ration between the propagation
+                    time and the mass of the walker, float
     :return: np array of unitary matrix propagtor
     """
     graph_laplacian = adjacency_matrix - np.diag(np.sum(adjacency_matrix, axis=0))
-    hamiltonian = -hopping_amplitude * graph_laplacian
-    return expm(1j * hamiltonian * propagation_time)
+    return expm(-1j * gamma * graph_laplacian / 2)
 
 
 def ctqw(propagator, initial_position, seed=None):
