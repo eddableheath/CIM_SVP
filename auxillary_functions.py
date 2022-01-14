@@ -101,6 +101,31 @@ def metropolis_filter_simple(current_state, proposal_state, lattice_basis):
         return False
 
 
+def metropolis_filter_log_cost(current_state, proposal_state, lattice_basis):
+    """
+        Alternative Metropolis filter with log based cost function (not a well defined distribution so this is more like
+        a SGD algorithm):
+                |log(||Bx||)|
+        This makes the length of the shortest vector the global minimum in integral lattices.
+    :param current_state: current integer vector state, int (m, )-ndarray
+    :param proposal_state: proposed integer vector state, int (m, )-ndarray
+    :param lattice_basis: lattice basis, int (m, m)-ndarray
+    :return: acceptance or rejection of proposal state, Bool
+    """
+    alpha = min(1,
+                np.where(np.linalg.norm(lattice_basis.T @ proposal_state) != 1,
+                         np.where(np.linalg.norm(lattice_basis.T @ proposal_state) != 0,
+                                  np.log(np.linalg.norm(lattice_basis.T @ current_state)) /
+                                  np.log(np.linalg.norm(lattice_basis.T @ proposal_state)),
+                                  0),
+                         np.inf)
+                )
+    if np.random.uniform(0, 1) <= alpha:
+        return True
+    else:
+        return False
+
+
 # Lattice Gaussian------------------------------------------------------------------------------------------------------
 def lattice_gaussian(lattice_basis, old_vector, new_vector):
     """
@@ -169,5 +194,20 @@ def split_dim(dimension, random=False):
             return inds
 
 
+# Testing
 if __name__ == "__main__":
-    print(split_dim(5, True))
+    x=1
+    # basis = np.array([[32, 0],
+    #                   [10, 1]])
+    # sv = np.array([2, -3])
+    # prop = np.array([4, 3])
+    # cur = np.array([1, -2])
+    # alpha = min(1, np.where(np.linalg.norm(sv) != 1,
+    #                         np.where(np.linalg.norm(sv) != 0,
+    #                                  np.log(np.linalg.norm(basis @ cur)) /
+    #                                  np.log(np.linalg.norm(sv)),
+    #                                  0),
+    #                         np.inf))
+    # print(np.linalg.norm(sv))
+    # print(np.linalg.norm(basis@cur))
+    # print(alpha)

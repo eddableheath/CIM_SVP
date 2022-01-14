@@ -13,6 +13,9 @@ import numpy as np
 import graph_functions as gf
 import CTQW as qf
 import networkx as nx
+import auxillary_functions as af
+from copy import copy
+import math
 
 
 def gen_generic_prob_density(dimension, graph_bounds, gamma):
@@ -28,13 +31,38 @@ def gen_generic_prob_density(dimension, graph_bounds, gamma):
     return coords, np.absolute(qf.prop_comp(adj_mat, gamma)[(adj_mat.shape[0]-1)//2])**2
 
 
+def compute_graph_bounds(lattice_basis, total_points):
+    """
+        Compute the range that the graph walk should be to be reasonably computable. Given a total number of points it
+        will give bounds that have either approximately those number of points spread over the correct dimensions or
+        the full integer bounds.
+    :param lattice_basis: lattice basis for computation of the dimension and integer bounds, int (m,m)-ndarray
+    :param total_points: total points to be included, int
+    :return: maximum bounds for the graph in each dimension, int
+    """
+    dimension = lattice_basis.shape[0]
+    integer_bounds = math.ceil(dimension * math.log2(dimension) + math.log2(np.linalg.norm(lattice_basis)))
+    bound = math.floor(total_points ** (1/float(dimension)) / 2)
+    if bound > integer_bounds:
+        return integer_bounds
+    else:
+        return bound
+
+
 class WalkExperiment:
 
     """
         Class for the walk experiment.
+
+        Cost function has two choices:
+            - 'gauss' selects the lattice gaussian as the target distribution.
+            - 'log' selects |log(||Bx||)| as the cost function.
     """
 
-    def __init__(self, lattice_basis, prop_density, graph_coords, graph_bounds):
+    def __init__(
+            self, lattice_basis, prop_density, graph_coords, graph_bounds, markov_iters, markov_comm,
+            cost_choice='gauss'
+    ):
         self.basis = lattice_basis
         self.dimension = self.basis.shape[0]
         self.int_lattice_bounds = self.dimension * np.log2(self.dimension) + np.log2(np.linalg.det(self.basis))
@@ -43,28 +71,102 @@ class WalkExperiment:
         self.graph_coords = graph_coords
         self.graph_bounds = graph_bounds
 
-        self.current_integer_vector = np.zeros(self.dimension)
-
-    def compute_overspill(self):
-        overspill_amounts = np.zeros_like(self.current_integer_vector)
-        for i in range(self.current_integer_vector.shape[0]):
-            if abs(self.current_integer_vector[i]) + self.graph_bounds > self.int_lattice_bounds:
-                overspill_amounts[i] = np.sign(self.current_integer_vector[i]) * (abs(self.current_integer_vector[i]) +
-                                                                                  self.graph_bounds -
-                                                                                  self.int_lattice_bounds)
-        return overspill_amounts
-
-    def compute_alt_prob_density(self, overspill):
-        grid_graph = nx.grid_graph(dim=[2*self.graph_bounds + 1 - overspill[i]
-                                        for i in range(self.dimension)])
-
+        self.current_integer_vector = np.random.randint(-self.graph_bounds, self.graph_bounds+1, self.dimension)
+        self.markov_chain = [copy(self.current_integer_vector)]
+        self.lattice_markov_chain = [self.basis.T @ copy(self.current_integer_vector)]
+        self.markov_iters = markov_iters
+        self.markov_comm = markov_comm
+        self.markov_cost_choice = cost_choice
 
     def update_state(self):
-        overspill = self.compute_overspill()
-        if sum(overspill) == 0:
-            dist = self.prob_density
-            coords = self.graph_coords
-        else:
-            x=1
-        self.current_integer_vector = self.current_integer_vector + np.asarray(coords[np.random.choice(dist.shape[0],
-                                                                                                       p=dist)])
+        proposal_int_state = self.current_integer_vector + \
+                             np.asarray(self.graph_coords[np.random.choice([i
+                                                                            for i in range(self.prob_density.shape[0])],
+                                                                           p=self.prob_density.tolist())])
+        while np.any(proposal_int_state > self.int_lattice_bounds):
+            print(proposal_int_state)
+            proposal_int_state = self.current_integer_vector + \
+                                 np.asarray(self.graph_coords[np.random.choice([i for i
+                                                                                in range(self.prob_density.shape[0])],
+                                                                               p=self.prob_density.tolist())])
+        if self.markov_cost_choice == 'gauss':
+            if af.metropolis_filter_simple(self.current_integer_vector, proposal_int_state, self.basis):
+                self.current_integer_vector = proposal_int_state
+        elif self.markov_cost_choice == 'log':
+            if af.metropolis_filter_log_cost(self.current_integer_vector, proposal_int_state, self.basis):
+                self.current_integer_vector = proposal_int_state
+        self.markov_chain.append(copy(self.current_integer_vector))
+        self.lattice_markov_chain.append(self.basis.T @ copy(self.current_integer_vector))
+
+    def run(self):
+        for i in range(self.markov_iters):
+            self.update_state()
+            print(self.markov_chain)
+
+    # Uncomment and finish up below for alt graph searching method rather than pruning method
+    # def compute_overspill(self):
+    #     overspill_amounts = np.zeros_like(self.current_integer_vector)
+    #     for i in range(self.current_integer_vector.shape[0]):
+    #         if abs(self.current_integer_vector[i]) + self.graph_bounds > self.int_lattice_bounds:
+    #            overspill_amounts[i] = np.sign(self.current_integer_vector[i]) * (abs(self.current_integer_vector[i]) +
+    #                                                                               self.graph_bounds -
+    #                                                                               self.int_lattice_bounds)
+    #     return overspill_amounts
+
+    # def compute_alt_prob_density(self, overspill):
+    #     grid_graph = nx.grid_graph(dim=[2*self.graph_bounds + 1 - overspill[i]
+    #                                     for i in range(self.dimension)])
+    #     coords = [[nodes[index] - self.graph_bounds]]
+
+    # def update_state(self):
+    #     overspill = self.compute_overspill()
+    #     if sum(overspill) == 0:
+    #         dist = self.prob_density
+    #         coords = self.graph_coords
+    #     else:
+    #         x=1
+    #     self.current_integer_vector = self.current_integer_vector + np.asarray(coords[np.random.choice(dist.shape[0],
+    #                                                                                                    p=dist)])
+
+
+# Testing
+if __name__ == "__main__":
+    # basis = np.array([[0, -1, -1, 1, 0],
+    #                   [1, -1, 0, 0, 1],
+    #                   [-1., -1, 1, 0, 1],
+    #                   [0, 1, -1, -1, 1],
+    #                   [0, 1, 1, 3, 1]])
+    basis = np.genfromtxt('Lattices/8/0/lll.csv', delimiter=',', dtype=None)
+    print(basis)
+    prop_pars = {
+        'dimension': basis.shape[0],
+        'graph_bounds': compute_graph_bounds(basis, 31**2),
+        'gamma': 3.5
+    }
+    coords, prob_density = gen_generic_prob_density(prop_pars['dimension'],
+                                                    prop_pars['graph_bounds'],
+                                                    prop_pars['gamma'])
+    pars = {
+        'basis': basis,
+        'prob_density': prob_density,
+        'coords': coords,
+        'graph_bounds': prop_pars['graph_bounds'],
+        'markov_iters': 100,
+        'markov_comm': 1e-7,
+        'cost_choice': 'gauss'
+    }
+
+    test_exp = WalkExperiment(
+        pars['basis'],
+        pars['prob_density'],
+        pars['coords'],
+        pars['graph_bounds'],
+        pars['markov_iters'],
+        pars['markov_comm'],
+        pars['cost_choice']
+    )
+
+    test_exp.run()
+    print(test_exp.markov_chain)
+    print(test_exp.lattice_markov_chain)
+    print(np.linalg.norm(test_exp.lattice_markov_chain, axis=1))
