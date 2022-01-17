@@ -16,6 +16,7 @@ import networkx as nx
 import auxillary_functions as af
 from copy import copy
 import math
+import os
 
 
 def gen_generic_prob_density(dimension, graph_bounds, gamma):
@@ -84,7 +85,7 @@ class WalkExperiment:
                                                                             for i in range(self.prob_density.shape[0])],
                                                                            p=self.prob_density.tolist())])
         while np.any(proposal_int_state > self.int_lattice_bounds):
-            print(proposal_int_state)
+            # print(proposal_int_state)
             proposal_int_state = self.current_integer_vector + \
                                  np.asarray(self.graph_coords[np.random.choice([i for i
                                                                                 in range(self.prob_density.shape[0])],
@@ -101,7 +102,7 @@ class WalkExperiment:
     def run(self):
         for i in range(self.markov_iters):
             self.update_state()
-            print(self.markov_chain)
+            # print(self.markov_chain)
 
     # Uncomment and finish up below for alt graph searching method rather than pruning method
     # def compute_overspill(self):
@@ -136,37 +137,54 @@ if __name__ == "__main__":
     #                   [-1., -1, 1, 0, 1],
     #                   [0, 1, -1, -1, 1],
     #                   [0, 1, 1, 3, 1]])
-    basis = np.genfromtxt('Lattices/8/0/lll.csv', delimiter=',', dtype=None)
-    print(basis)
-    prop_pars = {
-        'dimension': basis.shape[0],
-        'graph_bounds': compute_graph_bounds(basis, 31**2),
-        'gamma': 3.5
-    }
-    coords, prob_density = gen_generic_prob_density(prop_pars['dimension'],
-                                                    prop_pars['graph_bounds'],
-                                                    prop_pars['gamma'])
-    pars = {
-        'basis': basis,
-        'prob_density': prob_density,
-        'coords': coords,
-        'graph_bounds': prop_pars['graph_bounds'],
-        'markov_iters': 100,
-        'markov_comm': 1e-7,
-        'cost_choice': 'gauss'
-    }
+    for i in range(2, 8):
+        os.mkdir('results/'+str(i))
+        for j in range(32):
+            os.mkdir('results/'+str(i)+'/'+str(j))
+            for k in range(1000):
+                print('current index:'+str(i)+str(j)+str(k))
+                basis = np.genfromtxt('Lattices/'+str(i)+'/'+str(j)+'/lll.csv', delimiter=',', dtype=None)
+                prop_pars = {
+                    'dimension': basis.shape[0],
+                    'graph_bounds': compute_graph_bounds(basis, 31**2),
+                    'gamma': 3.5
+                }
+                coords, prob_density = gen_generic_prob_density(prop_pars['dimension'],
+                                                                prop_pars['graph_bounds'],
+                                                                prop_pars['gamma'])
+                pars = {
+                    'basis': basis,
+                    'prob_density': prob_density,
+                    'coords': coords,
+                    'graph_bounds': prop_pars['graph_bounds'],
+                    'markov_iters': 10000,
+                    'markov_comm': 1e-7,
+                    'cost_choice': 'gauss'
+                }
 
-    test_exp = WalkExperiment(
-        pars['basis'],
-        pars['prob_density'],
-        pars['coords'],
-        pars['graph_bounds'],
-        pars['markov_iters'],
-        pars['markov_comm'],
-        pars['cost_choice']
-    )
+                test_exp = WalkExperiment(
+                    pars['basis'],
+                    pars['prob_density'],
+                    pars['coords'],
+                    pars['graph_bounds'],
+                    pars['markov_iters'],
+                    pars['markov_comm'],
+                    pars['cost_choice']
+                )
 
-    test_exp.run()
-    print(test_exp.markov_chain)
-    print(test_exp.lattice_markov_chain)
-    print(np.linalg.norm(test_exp.lattice_markov_chain, axis=1))
+                path = 'results/'+str(i)+'/'+str(j)+'/'+str(k)
+                print('save path: '+path)
+                os.mkdir(path)
+
+                experiment = WalkExperiment(
+                    pars['basis'],
+                    pars['prob_density'],
+                    pars['coords'],
+                    pars['graph_bounds'],
+                    pars['markov_iters'],
+                    pars['markov_comm'],
+                    pars['cost_choice']
+                )
+                experiment.run()
+                np.savetxt(path+'/ints.csv', X=np.array(experiment.markov_chain), delimiter=',')
+                np.savetxt(path+'/latts.csv', X=np.array(experiment.lattice_markov_chain), delimiter=',')
