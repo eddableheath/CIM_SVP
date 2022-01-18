@@ -16,10 +16,10 @@ def prop_comp(adjacency_matrix, gamma):
     :param adjacency_matrix: adjacency matrix of the underlying graph
     :param gamma: combination of the hopping amplitude and the propagation time, i.e. the ration between the propagation
                     time and the mass of the walker, float
-    :return: np array of unitary matrix propagtor
+    :return: np array of unitary matrix propagator
     """
     graph_laplacian = adjacency_matrix - np.diag(np.sum(adjacency_matrix, axis=0))
-    return expm(-1j * gamma * graph_laplacian / 2)
+    return expm(1j * gamma * graph_laplacian)
 
 
 def ctqw(propagator, initial_position, seed=None):
