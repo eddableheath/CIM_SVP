@@ -19,6 +19,8 @@ import math
 import os
 import multiprocessing as mp
 import moving_walk_config as config
+from re import findall
+from itertools import filterfalse
 
 
 def gen_generic_prob_density(dimension, graph_bounds, gamma):
@@ -99,7 +101,8 @@ class WalkExperiment:
                                                                                 in range(self.prob_density.shape[0])],
                                                                                p=self.prob_density.tolist())])
         if self.markov_cost_choice == 'gauss':
-            if af.metropolis_filter_simple(self.current_integer_vector, proposal_int_state, self.basis):
+            if af.metropolis_filter_simple(self.current_integer_vector,
+                                           proposal_int_state, self.basis, self.latt_gauss_sigma):
                 self.current_integer_vector = proposal_int_state
         elif self.markov_cost_choice == 'log':
             if af.metropolis_filter_log_cost(self.current_integer_vector, proposal_int_state, self.basis):
@@ -138,7 +141,9 @@ def multi_run(pars, iter):
 
 # Run
 if __name__ == "__main__":
-    os.mkdir('results/'+str(config.lattice_num))
+    path = '/rds/general/user/ead17/ephemeral/ctqw_results' + str(config.dimension) + '/' + config.lattice_type
+    if str(config.lattice_num) not in os.listdir(path):
+        os.mkdir(path + '/' + str(config.lattice_num))
     prop_pars = {
         'dimension': config.lattice_basis.shape[0],
         'graph_bounds': compute_graph_bounds(config.lattice_basis, 31**2),
@@ -155,12 +160,17 @@ if __name__ == "__main__":
         'markov_iters': 10000,
         'markov_comm': 1e-7,
         'cost_choice': 'gauss',
-        'path': 'results/'+str(config.lattice_num)
+        'path': path + '/' + str(config.lattice_num)
     }
 
     pool = mp.Pool(config.cores)
 
-    iterables = range(config.number_of_runs)
+    if len(os.listdir(path)) == 0:
+        iterables = range(config.number_of_runs)
+    else:
+        (_, results_names, _) = next(os.walk(path))
+        result_numbers = [int(findall(r'd\+', string)[0]) for string in results_names]
+        iterables = filterfalse(lambda x: x in result_numbers, range(config.number_of_runs))
 
     [pool.apply(multi_run,
                 args=(pars,

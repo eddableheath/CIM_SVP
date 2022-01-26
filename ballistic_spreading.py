@@ -18,66 +18,56 @@ import math
 import os
 
 
-def compute_variance(dimension, graph_bounds, gamma):
+def spatial_var(probability_distribution, coords, coord_choice=0):
     """
-        Compute the variance of the quantum walk distribution on a square PLG for a given dimension, graph size and
-        ratio of propagation time to walker mass (gamma).
-    :param dimension: dimension of the lattice, int
-    :param graph_bounds: bounds of the graph, int
-    :param gamma: ratio of propagation time and walker mass, float
-    :return: variance of the output distribution over the PLG.
+        Compute the spatial variance for a given distribution over the integer lattice, based purely on one dimension
+        (sufficient due to symmetry):
+
+            sigma_x = <x^2> - <x>^2,       <x> = sum_{j,k=1}^{N_j, N_i} rho_{jk}x_{jk}
+
+    :param probability_distribution: probability distribution over graph, real-(m, )-ndarray
+    :param coords: coordinate map from graph to integer lattice, list of lists of ints
+    :param coord_choice: coordinate to choice to compute variance over (optional, default=0), int
+    :return: spatial variance, float
     """
-    _, adj_mat = gf.generic_adjacency_matrix(graph_bounds, dimension)
-    dist = qw.prop_comp(adj_mat, gamma)[(adj_mat.shape[0]-1)//2]
-    return np.var(dist)
+    if coord_choice > len(coords[0]):
+        print('Coordinate choice greater than problem dimension, defaulting to 0')
+        coord_choice = 0
+    coord_vals = np.asarray([coord[coord_choice] for coord in coords])
+    return np.sum(probability_distribution * (coord_vals**2)) - np.sum(probability_distribution * coord_vals)**2
 
 
-def compute_graph_bounds(dimension, total_points):
+def run(dimension, graph_bounds, max_gamma, gamma_steps):
     """
-        Compute the graph bounds to compute over based on the total number of points in the lattice. The total number
-        of points will be based on the memory constraints available.
-    :param dimension: dimension of the lattice, int
-    :param total_points: total points in lattice/graph, int
-    :return: bounds on the lattice, int
+        Run the ballistic spread experiment for a given dimension, graph bounds and gamma.
+    :param dimension: lattice dimension, int
+    :param graph_bounds: bounds on the graph, int
+    :param max_gamma: maximum gamma to test for, float
+    :param gamma_steps: total number of steps to examine gamma for, int
+    :return: writes np array of (gamma, spatial var) to file.
     """
-    return math.floor(total_points ** (1 / float(dimension)) // 2)
-
-
-def var_experiment(pars):
-    gamma_vals = np.linspace(
-        0,
-        pars['max_gamma'],
-        pars['max_gamma']*pars['gamma_granularity']
+    gammas = np.linspace(0, max_gamma, gamma_steps)
+    coords, adj = gf.generic_adjacency_matrix(graph_bounds, dimension)
+    np.savetxt(
+        'spreading_results/'+str(dimension),
+        np.asarray([[gamma,
+                     spatial_var(
+                         np.abs(qw.prop_comp(adj, gamma)[(adj.shape[0]-1)//2])**2,
+                         coords
+                     )]
+                    for gamma in gammas]),
+        delimiter=','
     )
-    return {
-        dim: {
-            gamma: compute_variance(dim, compute_graph_bounds(dim, pars['max_points']), gamma)
-            for gamma in gamma_vals
-        }
-        for dim in range(pars['dimension_range'][0], pars['dimension_range'][1]+1)
-    }
-
-
-def curve(gamma, a, p):
-    return a * gamma**p
 
 
 # Run
 if __name__ == "__main__":
-    var_pars = {
-        'max_points': 68**4,
-        'max_gamma': 5,
-        'gamma_granularity': 5,
-        'dimension_range': [2, 7]
-    }
+    dim_2_range = 31
+    max_g = 2.
+    g_steps = 20
 
-    results = var_experiment(var_pars)
-
-    for dim in results.keys():
-        np.savetxt('spreading_results/'+str(dim)+'.csv',
-                   np.array([[gamma, results[dim][gamma]] for gamma in results[dim].keys()]),
-                   delimiter=',')
-
-
+    for dim in range(2, 7):
+        bounds = (dim_2_range**2)**(1/float(dim)) // 2
+        run(dim, int(bounds), max_g, g_steps)
 
 
