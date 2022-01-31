@@ -10,9 +10,6 @@
 """
 
 import numpy as np
-import graph_functions as gf
-import CTQW as qf
-# import networkx as nx
 import auxillary_functions as af
 from copy import copy
 import math
@@ -21,37 +18,6 @@ import multiprocessing as mp
 import moving_walk_config as config
 from re import findall
 from itertools import filterfalse
-
-
-def gen_generic_prob_density(dimension, graph_bounds, gamma):
-    """
-        For a generic walk on a square planar lattice graph in a specified dimension or specified range and propagation
-        time output the probability density generated from the walker starting at the central node.
-    :param dimension: dimension of the graph to be searched over.
-    :param graph_bounds: bounds of the graph to be searched over.
-    :param gamma: single parameter for this model, the ration of the propagation time to the mass of the walker.
-    :return: (m,) real ndarray representing the probability.
-    """
-    coords, adj_mat = gf.generic_adjacency_matrix(graph_bounds, dimension)
-    return coords, np.absolute(qf.prop_comp(adj_mat, gamma)[(adj_mat.shape[0]-1)//2])**2
-
-
-def compute_graph_bounds(lattice_basis, total_points):
-    """
-        Compute the range that the graph walk should be to be reasonably computable. Given a total number of points it
-        will give bounds that have either approximately those number of points spread over the correct dimensions or
-        the full integer bounds.
-    :param lattice_basis: lattice basis for computation of the dimension and integer bounds, int (m,m)-ndarray
-    :param total_points: total points to be included, int
-    :return: maximum bounds for the graph in each dimension, int
-    """
-    dimension = lattice_basis.shape[0]
-    integer_bounds = math.ceil(dimension * math.log2(dimension) + math.log2(np.linalg.norm(lattice_basis)))
-    bound = math.floor(total_points ** (1/float(dimension)) / 2)
-    if bound > integer_bounds:
-        return integer_bounds
-    else:
-        return bound
 
 
 class WalkExperiment:
@@ -116,47 +82,44 @@ class WalkExperiment:
             # print(self.markov_chain)
 
 
-def multi_run(pars, iter):
+def multi_run(pars, it):
     """
         Running a multiprocessed version of the experiment.
     :param pars: parameters for the run
-    :param iter: current iteration
+    :param it: current iteration
     :return: writes results to file
     """
-    path = pars['path'] + str(iter)
-    os.mkdir(path)
-    experiment = WalkExperiment(
-        pars['basis'],
-        pars['prob_density'],
-        pars['coords'],
-        pars['graph_bounds'],
-        pars['markov_iters'],
-        pars['markov_comm'],
-        pars['cost_choice']
-    )
-    experiment.run()
-    np.savetxt(path+'/ints.csv', X=np.array(experiment.markov_chain), delimiter=',')
-    np.savetxt(path+'/latts.csv', X=np.array(experiment.lattice_markov_chain), delimiter=',')
+    if it in os.listdir(pars['path']):
+        return 1
+    else:
+        new_path = pars['path'] + '/' + str(it)
+        os.mkdir(path)
+        experiment = WalkExperiment(
+            pars['basis'],
+            pars['prob_density'],
+            pars['coords'],
+            pars['graph_bounds'],
+            pars['markov_iters'],
+            pars['markov_comm'],
+            pars['cost_choice']
+        )
+        experiment.run()
+        np.savetxt(new_path+'/ints.csv', X=np.array(experiment.markov_chain), delimiter=',')
+        np.savetxt(new_path+'/latts.csv', X=np.array(experiment.lattice_markov_chain), delimiter=',')
 
 
 # Run
 if __name__ == "__main__":
-    path = '/rds/general/user/ead17/ephemeral/ctqw_results' + str(config.dimension) + '/' + config.lattice_type
+    path = '/rds/general/user/ead17/ephemeral/ctqw_results/'+ str(config.gamma_mark) + '/' \
+           + str(config.dimension) + '/' + config.lattice_type
     if str(config.lattice_num) not in os.listdir(path):
         os.mkdir(path + '/' + str(config.lattice_num))
-    prop_pars = {
-        'dimension': config.lattice_basis.shape[0],
-        'graph_bounds': compute_graph_bounds(config.lattice_basis, 31**2),
-        'gamma': config.gamma
-    }
-    g_coords, prob_density = gen_generic_prob_density(prop_pars['dimension'],
-                                                      prop_pars['graph_bounds'],
-                                                      prop_pars['gamma'])
-    pars = {
+
+    spec_pars = {
         'basis': config.lattice_basis,
-        'prob_density': prob_density,
-        'coords': g_coords,
-        'graph_bounds': prop_pars['graph_bounds'],
+        'prob_density': config.dist,
+        'coords': config.coords,
+        'graph_bounds': config.graph_bounds,
         'markov_iters': 10000,
         'markov_comm': 1e-7,
         'cost_choice': 'gauss',
@@ -165,15 +128,15 @@ if __name__ == "__main__":
 
     pool = mp.Pool(config.cores)
 
-    if len(os.listdir(path)) == 0:
+    if len(os.listdir(spec_pars['path'])) == 0:
         iterables = range(config.number_of_runs)
     else:
-        (_, results_names, _) = next(os.walk(path))
-        result_numbers = [int(findall(r'd\+', string)[0]) for string in results_names]
+        (_, results_names, _) = next(os.walk(spec_pars['path']))
+        result_numbers = [int(findall(r'\d+', string)[0]) for string in results_names]
         iterables = filterfalse(lambda x: x in result_numbers, range(config.number_of_runs))
 
     [pool.apply(multi_run,
-                args=(pars,
+                args=(spec_pars,
                       i))
      for i in iterables]
 

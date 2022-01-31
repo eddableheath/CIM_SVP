@@ -62,12 +62,13 @@ def run(dimension, graph_bounds, max_gamma, gamma_steps):
 
 # Run
 if __name__ == "__main__":
-    dim_2_range = 31
+    dim_2_range = 40
     max_g = 2.
     g_steps = 20
 
-    for dim in range(2, 7):
-        bounds = (dim_2_range**2)**(1/float(dim)) // 2
+    for dim in range(3, 8):
+        bounds = (dim_2_range**2)**(1/float(dim)) // 2 - 1
         run(dim, int(bounds), max_g, g_steps)
+        print(f'done with dim {dim}')
 
 
