@@ -6,7 +6,7 @@
 import numpy as np
 import pandas as pd
 
-import lattice_to_ising as lf
+import isingify as lf
 import CIM_CAC_sim as sim
 from copy import copy
 import matplotlib.pyplot as plt
@@ -185,14 +185,17 @@ class CIM_CAC_SVP_experiment(CIM_CAC_experiment):
         self.k = sitek
         self.qudit_mapping = qudit_mapping
         if self.qudit_mapping == 'bin':
-            self.qubits_per_qudit = np.ceil(np.log2(2*self.k))
-        elif self.qudit_mapping == 'gray':
-            self.qubits_per_qudit = np.ceil(np.log2(2*self.k))
-        else:
+            self.qubits_per_qudit = int(np.ceil(np.log2(2*self.k)))
+        elif self.qudit_mapping == 'poly':
+            self.qubits_per_qudit = int(np.ceil(
+                (np.sqrt(16 * sitek + 1) - 1) / 2
+            ))
+        elif self.qudit_mapping == 'ham':
             self.qubits_per_qudit = 2 * self.k
 
         self.spin_results = []
-        CIM_CAC_experiment.__init__(self, self.preprocess(), t_amp_start, t_amp_raise, beta, pumpfield_start,
+        self.J_ij, self.identity_coeff = self.preprocess()
+        CIM_CAC_experiment.__init__(self, self.J_ij, t_amp_start, t_amp_raise, beta, pumpfield_start,
                                     pumpfield_raise, time_step, time_splits, no_repetitions, results_tolerance,
                                     ground_energy)
 
@@ -204,17 +207,16 @@ class CIM_CAC_SVP_experiment(CIM_CAC_experiment):
         """
 
         if self.qudit_mapping == 'bin':
-            ind = 0
-            vect = []
+            k = self.qubits_per_qudit
+            vect = np.zeros(self.dim)
+            psi = (1 - bitstr)/2
             for i in range(self.dim):
-                num = -2 ** (self.qubits_per_qudit - 1)
-                for j in range(int(self.qubits_per_qudit)):
-                    num += bitstr[ind] * (2 ** j)
-                    ind += 1
-                vect.append(num)
-            return np.array(vect)
+                vect[i] = int(np.sum(
+                    psi[i*k:(i+1)*k] * 2**np.arange(k)
+                ))
+            return vect
 
-        else:  # ham encoding for now
+        elif self.qudit_mapping == 'ham':
             ind = 0
             vect = []
             for i in range(self.dim):
@@ -225,6 +227,16 @@ class CIM_CAC_SVP_experiment(CIM_CAC_experiment):
                 vect.append(num)
             return np.array(vect)
 
+        elif self.qudit_mapping == 'poly':
+            k = self.qubits_per_qudit
+            mu = int(np.ceil(k/2)) % 2
+            vect = np.zeros(self.dim)
+            for i in range(self.dim):
+                vect[i] = int(np.sum(
+                    bitstr[i*k: (i+1)*k] * (np.arange(1, k+1)/2)
+                ) + (mu/2))
+            return vect
+
     def preprocess(self):
         """
             Take the lattice properties and map them to relevant properties used by the CIM, specifically the
@@ -232,9 +244,11 @@ class CIM_CAC_SVP_experiment(CIM_CAC_experiment):
         """
 
         if self.qudit_mapping == "bin":
-            return lf.svp_isingcoeffs_bin(self.gramm, self.k)[0]
-        else:  # currently just the hamming implementation but potentially the Gray code on too
-            return lf.svp_isingcoeffs_ham(self.gramm, self.k)[0]
+            return lf.bin_couplings(self.gramm, self.k)
+        elif self.qudit_mapping == 'ham':
+            return lf.ham_couplings(self.gramm, self.k)
+        elif self.qudit_mapping == 'poly':
+            return lf.poly_couplings(self.gramm, self.k)
 
     def execute(self):
         """
@@ -247,12 +261,19 @@ class CIM_CAC_SVP_experiment(CIM_CAC_experiment):
         """
             post process the results from CIM to SVP
         """
-        int_vects = [self.bitstr_to_coeff_vector(((1 + sim.rounding_spins_vectorised(spins)) / 2).astype(int))
+        print(self.spin_results[0])
+        print(sim.rounding_spins_vectorised(self.spin_results[0]))
+        print(sim.E_ising(self.J_ij, sim.rounding_spins_vectorised(self.spin_results[0])))
+        print(self.identity_coeff)
+        print(sim.E_ising(self.J_ij, sim.rounding_spins_vectorised(self.spin_results[0])) + self.identity_coeff)
+        int_vects = [self.bitstr_to_coeff_vector(sim.rounding_spins_vectorised(spins).astype(int))
                      for spins in self.spin_results]
         latt_vects = [np.dot(self.basis.T, vect) for vect in int_vects]
         norms = [np.linalg.norm(vect) for vect in latt_vects]
-        df = pd.DataFrame(data=list(zip(np.around(self.spin_results, 2), int_vects, latt_vects, norms)),
-                          columns=['spins', 'integer vectors', 'lattice vectors', 'norms'])
+        ising_energies = [sim.E_ising(self.J_ij, sim.rounding_spins_vectorised(spins)) + self.identity_coeff
+                          for spins in self.spin_results]
+        df = pd.DataFrame(data=list(zip(np.around(self.spin_results, 2), int_vects, latt_vects, norms, ising_energies)),
+                          columns=['spins', 'integer vectors', 'lattice vectors', 'norms', 'ising energies'])
         return df
 
     def run(self, result_type='return', plots=False):
@@ -264,10 +285,11 @@ class CIM_CAC_SVP_experiment(CIM_CAC_experiment):
         :param plots: (default=False) also plot the spin trajectories
         """
         self.spins = np.random.randn(self.problem_size) - 0.5
+        self.spins[-1] = 1
         self.error = 10*np.ones(self.problem_size)
         self.execute()
         results = self.postprocess()
-        path = ''
+        path = '.'
 
         if plots:
             self.plot_trajectories()
@@ -275,4 +297,4 @@ class CIM_CAC_SVP_experiment(CIM_CAC_experiment):
         if result_type == 'return':
             return results
         elif result_type == 'write':
-            results.csv(path)
+            results.to_csv(f'{path}/test.csv')

@@ -39,7 +39,7 @@ def main_SVP(result_type, plots=False):
 
 
 if __name__ == "__main__":
-    results = main_SVP('return')
+    results = main_SVP('write', False)
     print(results)
     # main(True)
 

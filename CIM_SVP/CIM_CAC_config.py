@@ -5,37 +5,33 @@
 # purely for running scripts.
 
 import numpy as np
-import lattice_to_ising as lj
+import isingify as lj
 import CIM_CAC_sim as sim
+import os
+import fnmatch
 
 # Lattice parameters -------------------------------------------------------------------------------------
-lattice_dim = 5
-lattice_type = 'lll'
-lattice_no = 0
-# lattice_basis = np.genfromtxt('Lattices/'+str(lattice_dim)+'/'+str(lattice_no)+'/'+lattice_type+'.csv',
-#                               delimiter=',', dtype=None)
-lattice_basis = np.array([[3, 4],
-                          [2, 3]])
+lattice_dim = 2
+lattice_no = 2
+lattice_basis = np.genfromtxt(f'lattices/{str(lattice_dim)}/{str(lattice_no)}_1.csv',
+                              delimiter=',', dtype=None)
 latt_int_bounds = None
-encoding = 'ham'
+encoding = 'poly'
 # max_norm_bound = lj.minkowski_energy(lattice_basis)**2
 gramm = lattice_basis@lattice_basis.T
-sitek = 4
+sitek = 4 # Todo: Refactor to take into account some lattice bounds.
 
 # lattice interaction matrix
-q_level_spins = False
-if q_level_spins:
-    lattice_interactions = lj.Jij_qary(lattice_basis)
-else:
-    if encoding == 'bin':
-        lattice_interactions = lj.svp_isingcoeffs_bin(lattice_basis@lattice_basis.T, sitek)[0]
-        # print(lattice_interactions)
-    else: # defaults to Ham encoding
-        lattice_interactions = lj.svp_isingcoeffs_ham(gramm, sitek)[0]
-
+if encoding == 'poly':
+    lattice_interactions, identity_coeff = lj.poly_couplings(gramm, sitek)
+elif encoding == 'bin':
+    lattice_interactions, identity_coeff = lj.bin_couplings(lattice_basis@lattice_basis.T, sitek)
+elif encoding == 'ham':
+    lattice_interactions, identity_coeff = lj.ham_couplings(gramm, sitek)
+print(lattice_basis)
+print(lattice_interactions)
+print(identity_coeff)
 use_lattice_interactions = True
-
-# print(lattice_interactions)
 
 # Interactions -------------------------------------------------------------------------------------------
 instance_set_path = "../InstanceSets/BENCHSKL/"

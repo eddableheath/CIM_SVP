@@ -5,6 +5,7 @@
 """
 
 import numpy as np
+import isingify as li
 
 
 def interactions(gramm, sitek):
@@ -77,32 +78,45 @@ def ising_energy(vec, inters):
 
 
 def main():
-    inters, id_con = binteractions(
+    inters, id_con = li.poly_couplings(
         pars['basis']@pars['basis'].T,
         pars['int_range']
     )
     print(inters)
     print(id_con)
     gramm = pars['basis'] @ pars['basis'].T
-    qubits_per_qudit = int(np.floor(np.log2(pars['int_range']))+1)
+    qubits_per_qudit = int(np.ceil(
+        (np.sqrt(16 * pars['int_range'] + 1) - 1) / 2
+    ))
     print(qubits_per_qudit)
-    print(gramm)
-    vec = np.random.randint(2, size=int(gramm.shape[0]*qubits_per_qudit))
-    # vec = (2*vec) - 1
-    print(vec)
-    bint1 = sum([2**i * vec[:qubits_per_qudit][i] for i in range(qubits_per_qudit)])
-    print(bint1)
-    bint2 = sum([2**i * vec[qubits_per_qudit:][i] for i in range(qubits_per_qudit)])
-    print(bint2)
-    alt_sum = bint1**2*gramm[0, 0] + bint1*bint2*gramm[0, 1] + bint1*bint2*gramm[1, 0] + bint2**2*gramm[1, 1]
-    print(ising_energy(vec, inters))
-    print(alt_sum)
-    print(ising_energy(vec, inters) + id_con)
+    # qubits_per_qudit = int(np.ceil(np.log2(pars['int_range'])) + 1)
+    mu = int(np.ceil(qubits_per_qudit/2)) % 2
+    print(mu)
+    rand_vect = np.random.randint(0, 2, inters.shape[0])
+    rand_vect[-1] = 1
+    print(rand_vect)
+    rand_vect = (2*rand_vect) - 1
+    print(rand_vect)
+    print(ising_energy(rand_vect, inters))
+    print(ising_energy(rand_vect, inters) + id_con)
+    vect = np.zeros(gramm.shape[0])
+    for i in range(gramm.shape[0]):
+        vect[i] = int(np.sum(
+            rand_vect[i*qubits_per_qudit:(i+1)*qubits_per_qudit] * (np.arange(1, qubits_per_qudit+1)/2)
+        )+(mu/2))
+    # for i in range(gramm.shape[0]):
+    #     vect[i] = int(np.sum(
+    #         -rand_vect[i*qubits_per_qudit:(i+1)*qubits_per_qudit] * 2**np.arange(qubits_per_qudit)
+    #     )) - 2**qubits_per_qudit
+    print(vect)
+    latt_vect = pars['basis'].T @ vect
+    print(latt_vect)
+
 
 
 if __name__ == '__main__':
     pars = {
         'basis': np.array([[1, 1], [0, 1]]),
-        'int_range': 5
+        'int_range': 6
     }
     main()

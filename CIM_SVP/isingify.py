@@ -7,7 +7,7 @@
 """
 
 import numpy as np
-np.set_printoptions(edgeitems=10,linewidth=180)
+np.set_printoptions(edgeitems=10, linewidth=180)
 
 
 def poly_couplings(gramm, sitek):
@@ -41,7 +41,7 @@ def poly_couplings(gramm, sitek):
         # Add in auxillary terms
         for j in range(qubits_per_qudit):
             mj_qubit = (m * qubits_per_qudit) + j
-            coeff = mu * 1/2 * (j+1) * np.sum(gramm[m])
+            coeff = mu * 1/4 * (j+1) * np.sum(gramm[m])
             jmat[mj_qubit, -1] = coeff
             jmat[-1, mj_qubit] = coeff
 
@@ -53,13 +53,15 @@ def poly_couplings(gramm, sitek):
 def bin_couplings(gramm, sitek):
     """
         Compute the binary encodings for the QUBO representation coupling strengths for the CIM.
+
+        Note: Uses mapping 1 --> -1, 0 --> 1
     :param gramm: gramm matrix defining the problem, integer (m, m)-ndarray
     :param sitek: integer range to be explored, integer
     :return: - couplings array, float (n, n,)-ndarray
              - identity coefficient, float
     """
     qudits = gramm.shape[0]
-    qubits_per_qudit = int(np.floor(np.log2(sitek)) + 1)
+    qubits_per_qudit = int(np.ceil(np.log2(sitek)) + 1)
     qubits = qudits * qubits_per_qudit + 1
     jmat = np.zeros((qubits, qubits))
     ic = 0
@@ -82,7 +84,7 @@ def bin_couplings(gramm, sitek):
             jmat[mj_qubit, -1] = coeff
             jmat[-1, mj_qubit] = coeff
 
-    ic += 1/2 * np.sum(gramm)
+    # ic += 1/2 * np.sum(gramm)
 
     return jmat, ic
 
