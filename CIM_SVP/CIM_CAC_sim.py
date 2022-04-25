@@ -48,17 +48,17 @@ def std_energy(interactions, spins, pumpfield, normalisation):
     return np.sum((spins*spins)/4.0 - (pumpfield*spins*spins)/2.0 + normalisation*spins*np.dot(interactions, spins))
 
 
-def E_ising(interactions, spins):
+def E_ising(interactions, spins, identity_coeff):
     """
         Ising energy computation
     :param interactions: J_ij, square numpy array
     :param spins: spin variable, numpy array
     :return: Ising energy
     """
-    return np.sum(np.sign(spins)*np.dot(interactions, np.sign(spins)))
+    return np.sum(np.sign(spins)*np.dot(interactions, np.sign(spins))) + identity_coeff
 
 
-def limit_range(spin, tamp, ):
+def limit_range(spin, tamp):
     """
         # todo: workout what the function does
     :param spin: spin variable for state of ising model, np array
@@ -83,7 +83,7 @@ def simulation_step(interaction_terms, spin, error, normalisation, beta, pumpfie
     # Todo: check with Sam what this is again
     :return: integration step, a tuple of the next evolution in both cases.
     """
-    ising_summation = normalisation + np.dot(interaction_terms, spin) * error
+    ising_summation = normalisation * np.dot(interaction_terms, spin) * error
     spin_diff = -spin**3 + pumpfield * spin - ising_summation
 
     error_diff = -beta * error * (spin**2 - t_amp)

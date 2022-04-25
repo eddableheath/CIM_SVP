@@ -19,7 +19,7 @@ class CIM_CAC_experiment:
     """
 
     def __init__(self, interaction_terms, t_amp_start, t_amp_raise, beta, pumpfield_start, pumpfield_raise, time_step,
-                 time_splits, no_repetitions, results_tolerance, ground_energy=None):
+                 time_splits, no_repetitions, results_tolerance, ground_energy=None, identity_coeff=0.):
         """
         :param interaction_terms: interactions matrix (n, n) numpy array encoding (ZZ) interactions of ising model
         :param t_amp_start: t amplitude starting value, float
@@ -45,6 +45,7 @@ class CIM_CAC_experiment:
         self.time_splits = time_splits
         self.repetitions = no_repetitions
         self.tolerance = results_tolerance
+        self.identity_coeff=identity_coeff
 
         # instantiate in memory the spins and errors, to be generate fully when needed.
         self.spins = np.zeros(self.problem_size)
@@ -80,7 +81,7 @@ class CIM_CAC_experiment:
             t_amp = self.t_amp_start + (float(i) / self.time_splits) * self.t_amp_raise
             self.spins, self.error = sim.simulation_step(self.J_ij, self.spins, self.error, self.norm_coeff, self.beta,
                                                          pumpfield, self.time_step, t_amp)
-            E_opt = min(sim.E_ising(self.J_ij, self.spins), E_opt)
+            E_opt = min(sim.E_ising(self.J_ij, self.spins, self.identity_coeff), E_opt)
             if save_trajectory:
                 traj.append((copy(self.spins), copy(self.error), E_opt))
 
@@ -100,7 +101,7 @@ class CIM_CAC_experiment:
         for i in range(len(simulation_results)):
             spin_results[:, i] = simulation_results[i][0]
             error_results[:, i] = simulation_results[i][1]
-            ising_energy_results = sim.E_ising(self.J_ij, simulation_results[i][0])
+            ising_energy_results[i] = sim.E_ising(self.J_ij, simulation_results[i][0], self.identity_coeff)
 
         min_found_energy = np.min([result[2] for result in simulation_results])
 
@@ -111,7 +112,7 @@ class CIM_CAC_experiment:
         x_axis = np.array(range(self.time_splits)) * self.time_step
         plt.ylim((-2.5, 2.5))
         for i in range(self.problem_size):
-            plt.plot(x_axis, spin_results[i, :])
+            plt.plot(x_axis, spin_results[i, :], linewidth=0.1)
         plt.show()
         plt.close()
 
@@ -125,7 +126,7 @@ class CIM_CAC_experiment:
 
         plt.title("Residual Ising Energy Trajectory")
         x_axis = np.array(range(self.time_splits)) * self.time_step
-        plt.ylim((0, 10.0))
+        plt.ylim((0, max(ising_energy_results)))
         E_ref = copy(self.ground_E)
         if E_ref > 0:
             E_ref = min_found_energy
@@ -154,7 +155,7 @@ class CIM_CAC_experiment:
                 self.error = 10*np.ones(self.problem_size)
                 self.spins, _, E_opt = self.trajectories()
                 print(f"optimal energy: {E_opt - self.ground_E}")
-                print(f"energy: {sim.E_ising(self.J_ij, self.spins)}")
+                print(f"energy: {sim.E_ising(self.J_ij, self.spins, self.identity_coeff)}")
                 print(f"final spins: {self.spins}")
                 sucess_results.append(E_opt)
 
@@ -197,34 +198,33 @@ class CIM_CAC_SVP_experiment(CIM_CAC_experiment):
         self.J_ij, self.identity_coeff = self.preprocess()
         CIM_CAC_experiment.__init__(self, self.J_ij, t_amp_start, t_amp_raise, beta, pumpfield_start,
                                     pumpfield_raise, time_step, time_splits, no_repetitions, results_tolerance,
-                                    ground_energy)
+                                    ground_energy, identity_coeff=self.identity_coeff)
 
     def bitstr_to_coeff_vector(self, bitstr):
         """
-            Convert a list of spins (+/- 1) interpreted as a bitstring to a lattice coefficient vector
-        :param bitstr: list of spin states interpreted as bitstring through operator (1-s)/2
+            Convert a list of spins (+/- 1) interpreted as a bitstring to a lattice coefficient vector. Note the poly
+            encoding does not require changing to the {0, 1} basis.
+        :param bitstr: list of spin states interpreted as bitstring through operator (1-s)/2, (m, )-ndarray
         :return: comma-delimited coefficient vector as a string
         """
 
         if self.qudit_mapping == 'bin':
             k = self.qubits_per_qudit
+            print(f'k: {k}')
             vect = np.zeros(self.dim)
             psi = (1 - bitstr)/2
             for i in range(self.dim):
                 vect[i] = int(np.sum(
                     psi[i*k:(i+1)*k] * 2**np.arange(k)
                 ))
-            return vect
+            return vect - 2**(k-1)
 
         elif self.qudit_mapping == 'ham':
-            ind = 0
-            vect = []
+            k = self.qubits_per_qudit
+            vect = np.zeros(self.dim)
+            psi = (1 - bitstr) / 2
             for i in range(self.dim):
-                num = 0
-                for j in range(int(self.qubits_per_qudit)):
-                    num += bitstr[ind] / 2
-                    ind += 1
-                vect.append(num)
+                vect[i] = np.sum(psi[i*k:(i+1)*k])
             return np.array(vect)
 
         elif self.qudit_mapping == 'poly':
@@ -255,22 +255,28 @@ class CIM_CAC_SVP_experiment(CIM_CAC_experiment):
             run the simulation of the CIM SVP algorithm
         """
         for i in range(self.repetitions):
+            self.spins = np.random.randn(self.problem_size) - 0.5
+            self.spins[-1] = 1
+            self.error = 10 * np.ones(self.problem_size)
             self.spin_results.append(self.trajectories()[0])
 
     def postprocess(self):
         """
             post process the results from CIM to SVP
         """
+        def set_last_qubit_1(mu):
+            mu[-1] = np.abs(mu[-1])
+            return mu
         print(self.spin_results[0])
         print(sim.rounding_spins_vectorised(self.spin_results[0]))
-        print(sim.E_ising(self.J_ij, sim.rounding_spins_vectorised(self.spin_results[0])))
+        print(sim.E_ising(self.J_ij, np.sign(self.spin_results[0]), self.identity_coeff))
         print(self.identity_coeff)
-        print(sim.E_ising(self.J_ij, sim.rounding_spins_vectorised(self.spin_results[0])) + self.identity_coeff)
-        int_vects = [self.bitstr_to_coeff_vector(sim.rounding_spins_vectorised(spins).astype(int))
+        print(sim.E_ising(self.J_ij, np.sign(self.spin_results[0]), self.identity_coeff))
+        int_vects = [self.bitstr_to_coeff_vector(np.sign(spins).astype(int))
                      for spins in self.spin_results]
         latt_vects = [np.dot(self.basis.T, vect) for vect in int_vects]
-        norms = [np.linalg.norm(vect) for vect in latt_vects]
-        ising_energies = [sim.E_ising(self.J_ij, sim.rounding_spins_vectorised(spins)) + self.identity_coeff
+        norms = np.around([np.linalg.norm(vect) for vect in latt_vects], 2)
+        ising_energies = [sim.E_ising(self.J_ij, np.sign(spins), self.identity_coeff)
                           for spins in self.spin_results]
         df = pd.DataFrame(data=list(zip(np.around(self.spin_results, 2), int_vects, latt_vects, norms, ising_energies)),
                           columns=['spins', 'integer vectors', 'lattice vectors', 'norms', 'ising energies'])
@@ -284,9 +290,6 @@ class CIM_CAC_SVP_experiment(CIM_CAC_experiment):
                             the results to a results folder
         :param plots: (default=False) also plot the spin trajectories
         """
-        self.spins = np.random.randn(self.problem_size) - 0.5
-        self.spins[-1] = 1
-        self.error = 10*np.ones(self.problem_size)
         self.execute()
         results = self.postprocess()
         path = '.'

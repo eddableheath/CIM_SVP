@@ -180,7 +180,7 @@ a_start = a
 def traj(mu, ei):
     E_opt = 0
     for i in range(0,nt):
-        a = a_start  + (float(i)/nt)*a_raise
+        a = a_start + (float(i)/nt)*a_raise
         tamp = tamp_start + (float(i)/nt)*tamp_raise
         mu, ei = step(mu, ei, dt, a, tamp)
         E_opt = min(E_ising(mu), E_opt)

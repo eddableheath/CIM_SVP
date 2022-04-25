@@ -16,7 +16,7 @@ def main(plots=False):
         main function for running instantiation of experiment, including import of parameters from config file
     :param plots: (default = False) run experiment with plotting or not
     """
-    experiment = exp.CIM_CAC_experiment(config.interactions, config.tamp_start, config.tamp_raise, config.beta,
+    experiment = exp.CIM_CAC_experiment(inters, config.tamp_start, config.tamp_raise, config.beta,
                                         config.pf_start, config.pf_raise, config.time_step, config.time_splits,
                                         config.no_repetitions, config.res_tol)
     experiment.run(plots)
@@ -34,12 +34,17 @@ def main_SVP(result_type, plots=False):
     """
     experiment = exp.CIM_CAC_SVP_experiment(config.lattice_basis, config.sitek, config.encoding, config.tamp_start,
                                             config.tamp_raise, config.beta, config.pf_start, config.pf_raise,
-                                            config.time_step, config.time_splits, config.no_repetitions, config.res_tol)
+                                            config.time_step, config.time_splits, config.no_repetitions, config.res_tol,
+                                            ground_energy=config.ground_energy)
     return experiment.run(result_type, plots)
 
 
 if __name__ == "__main__":
-    results = main_SVP('write', False)
+    results = main_SVP('write')
     print(results)
-    # main(True)
+    # inters = np.random.randn(11, 11)
+    # for i in range(inters.shape[0]):
+    #     inters[i, i] = 0.
+    # print(inters)
+    # main(Fa)
 

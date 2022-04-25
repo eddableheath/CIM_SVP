@@ -80,11 +80,11 @@ def bin_couplings(gramm, sitek):
         # Add in auxillary terms
         for j in range(qubits_per_qudit):
             mj_qubit = (m * qubits_per_qudit) + j
-            coeff = 2**(j) * np.sum(gramm[m])
+            coeff = 2**(j-2) * np.sum(gramm[m])
             jmat[mj_qubit, -1] = coeff
             jmat[-1, mj_qubit] = coeff
 
-    # ic += 1/2 * np.sum(gramm)
+    ic += 1/4 * np.sum(gramm)
 
     return jmat, ic
 
