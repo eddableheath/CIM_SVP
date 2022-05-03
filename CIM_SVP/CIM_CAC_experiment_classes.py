@@ -81,6 +81,7 @@ class CIM_CAC_experiment:
             t_amp = self.t_amp_start + (float(i) / self.time_splits) * self.t_amp_raise
             self.spins, self.error = sim.simulation_step(self.J_ij, self.spins, self.error, self.norm_coeff, self.beta,
                                                          pumpfield, self.time_step, t_amp)
+            self.spins[-1] = 1.5 * np.sqrt(self.t_amp_start + self.t_amp_raise)
             E_opt = min(sim.E_ising(self.J_ij, self.spins, self.identity_coeff), E_opt)
             if save_trajectory:
                 traj.append((copy(self.spins), copy(self.error), E_opt))
@@ -108,31 +109,30 @@ class CIM_CAC_experiment:
         # TODO: print statements to be replaced with writing results to file
         print(f'print some for the results for the trajectories as well')
 
-        plt.title("Spin Trajectory")
-        x_axis = np.array(range(self.time_splits)) * self.time_step
-        plt.ylim((-2.5, 2.5))
-        for i in range(self.problem_size):
+        for i in range(len(simulation_results)):
+            plt.title("Spin Trajectory")
+            x_axis = np.array(range(self.time_splits)) * self.time_step
+            plt.ylim((-2.5, 2.5))
             plt.plot(x_axis, spin_results[i, :], linewidth=0.1)
-        plt.show()
-        plt.close()
+            plt.show()
+            plt.close()
 
-        plt.title("Error Trajectory")
-        x_axis = np.array(range(self.time_splits)) * self.time_step
-        plt.ylim((0, 5.0))
-        for i in range(self.problem_size):
+            plt.title("Error Trajectory")
+            x_axis = np.array(range(self.time_splits)) * self.time_step
+            plt.ylim((0, 5.0))
             plt.plot(x_axis, error_results[i, :])
-        plt.show()
-        plt.close()
+            plt.show()
+            plt.close()
 
-        plt.title("Residual Ising Energy Trajectory")
-        x_axis = np.array(range(self.time_splits)) * self.time_step
-        plt.ylim((0, max(ising_energy_results)))
-        E_ref = copy(self.ground_E)
-        if E_ref > 0:
-            E_ref = min_found_energy
-        # print(np.min(ising_energy_results))
-        plt.plot(x_axis, ising_energy_results - E_ref)
-        plt.show()
+            plt.title("Residual Ising Energy Trajectory")
+            x_axis = np.array(range(self.time_splits)) * self.time_step
+            plt.ylim((0, max(ising_energy_results)))
+            E_ref = copy(self.ground_E)
+            if E_ref > 0:
+                E_ref = min_found_energy
+            # print(np.min(ising_energy_results))
+            plt.plot(x_axis, ising_energy_results - E_ref)
+            plt.show()
 
     def run(self, plots=False):
         """
@@ -210,7 +210,6 @@ class CIM_CAC_SVP_experiment(CIM_CAC_experiment):
 
         if self.qudit_mapping == 'bin':
             k = self.qubits_per_qudit
-            print(f'k: {k}')
             vect = np.zeros(self.dim)
             psi = (1 - bitstr)/2
             for i in range(self.dim):
@@ -257,21 +256,13 @@ class CIM_CAC_SVP_experiment(CIM_CAC_experiment):
         for i in range(self.repetitions):
             self.spins = np.random.randn(self.problem_size) - 0.5
             self.spins[-1] = 1
-            self.error = 10 * np.ones(self.problem_size)
+            self.error = np.ones(self.problem_size)
             self.spin_results.append(self.trajectories()[0])
 
     def postprocess(self):
         """
             post process the results from CIM to SVP
         """
-        def set_last_qubit_1(mu):
-            mu[-1] = np.abs(mu[-1])
-            return mu
-        print(self.spin_results[0])
-        print(sim.rounding_spins_vectorised(self.spin_results[0]))
-        print(sim.E_ising(self.J_ij, np.sign(self.spin_results[0]), self.identity_coeff))
-        print(self.identity_coeff)
-        print(sim.E_ising(self.J_ij, np.sign(self.spin_results[0]), self.identity_coeff))
         int_vects = [self.bitstr_to_coeff_vector(np.sign(spins).astype(int))
                      for spins in self.spin_results]
         latt_vects = [np.dot(self.basis.T, vect) for vect in int_vects]

@@ -16,10 +16,10 @@ lattice_no = 2
 lattice_basis = np.genfromtxt(f'lattices/{str(lattice_dim)}/{str(lattice_no)}_1.csv',
                               delimiter=',', dtype=None)
 latt_int_bounds = None
-encoding = 'bin'
+encoding = 'poly1'
 # max_norm_bound = lj.minkowski_energy(lattice_basis)**2
 gramm = lattice_basis@lattice_basis.T
-sitek = 4 # Todo: Refactor to take into account some lattice bounds.
+sitek = 6 # Todo: Refactor to take into account some lattice bounds.
 
 # lattice interaction matrix
 if encoding == 'poly':

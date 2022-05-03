@@ -122,7 +122,7 @@ if(N<16):
 Jij_sum = 0.0
 for i in range(0,N):
     for j in range(0,i):
-        Jij_sum +=  abs(Jij[i,j])
+        Jij_sum += abs(Jij[i,j])
 
 Jij_sum = np.sqrt(Jij_sum/N)
 
