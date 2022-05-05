@@ -9,11 +9,11 @@ import numpy as np
 # Lattice parameters ---------------------------------------------------------------
 dimension = 2
 latt_numbers = 0
-latt_basis = np.array([[-1, 2],
-                       [2, -5]])  # read the basis from file
+latt_basis = np.array([[-5, -1],
+                       [-4, -1]])  # read the basis from file
 latt_int_bounds = None  # Set these from Chris's work
-sitek = 4               # compute this from latt_int_bounds
-qudit_mapping = 'bin'
+sitek = 6               # compute this from latt_int_bounds
+qudit_mapping = 'poly'  # ham, poly or bin
 
 # CIM parameters -------------------------------------------------------------------
 control_system = 'CAC'
@@ -52,12 +52,15 @@ elif control_system == 'SFC':
 nl_func = 1
 
 # Experimentation parameters -------------------------------------------------------
-time_diff = 0.125
+time_diff = 0.01
 iters = 3200
 var_iters = 2880
 stat_iters = 320
-repeats = 10
+repeats = 4
 save_trajectory = False
+
+# Multiprocessing parameters -------------------------------------------------------
+cores = 4
 
 # Pars dict ------------------------------------------------------------------------
 pars = {
@@ -80,5 +83,6 @@ pars = {
     'var_iters': var_iters,
     'stat_iters': stat_iters,
     'repeats': repeats,
-    'save_traj': save_trajectory
+    'save_traj': save_trajectory,
+    'cores': cores
 }

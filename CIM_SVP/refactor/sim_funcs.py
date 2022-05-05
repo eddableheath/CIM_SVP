@@ -69,7 +69,7 @@ def CAC_diff(**pars):
     """
     ising_sum = pars['error']*pars['normalisation']*np.dot(pars['couplings'], pars['spins'])
     return (-pars['spins']**3 + pars['pump']*pars['spins'] - ising_sum,
-            -pars['beta']*pars['error']*(pars['spins']-pars['tamp']))
+            -pars['beta']*pars['error']*(pars['spins']**2-pars['tamp']))
 
 
 def CFC_diff(**pars):
@@ -86,6 +86,7 @@ def CFC_diff(**pars):
     :return: timestep diff for spins and error terms: float-(m, )-ndarray, float-(m, )-ndarray
     """
     ising_sum = pars['error']*pars['normalisation']*np.dot(pars['couplings'], pars['spins'])
+    # print(f'ising sum here: {ising_sum}')
     return (-pars['spins']**3 + pars['pump']*pars['spins'] - ising_sum,
             -pars['beta']*pars['error']*(ising_sum**2-pars['tamp']))
 

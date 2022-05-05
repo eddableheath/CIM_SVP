@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import isingify
 from sim_funcs import simulation_step, normalisation_factor, ising_energy
+import multiprocessing as mp
 
 
 class CIM:
@@ -121,11 +122,12 @@ class CIM:
         for i in range(self.repeats):
             self.reset_exp()
             for j in range(self.iters):
+                print(f'at iteration {self.current_it} the spins are {self.spins} and error is {self.error}')
                 self.update_state()
-                self.current_it += 1
                 if self.save_traj:
                     self.traj_spins[self.current_repeat, self.current_it] = self.spins
                     self.traj_error[self.current_repeat, self.current_it] = self.error
+                self.current_it += 1
             self.results[self.current_repeat] = self.spins
             self.current_repeat += 1
         return self.results
@@ -212,7 +214,8 @@ class CIM_SVP(CIM):
             If an auxillary spin is required we should keep it set to 1.
         """
         if self.mu:
-            self.spins[-1] = self.limit_func(self.tamp_sched[self.current_it])
+            # self.spins[-1] = self.limit_func(self.tamp_sched[self.current_it])
+            self.spins[-1] = abs(self.spins[-1])
 
     def postprocess(self):
         """
@@ -247,15 +250,14 @@ class CIM_SVP(CIM):
         for i in range(self.repeats):
             self.reset_exp()
             self.set_last_spin_1()
-            # print(f'starting spins for experiment {self.current_repeat}: {self.spins}')
-            # print(f'starting error for experiment {self.current_repeat}: {self.error}')
             for j in range(self.iters):
+                # print(f'at iteration {self.current_it} the spins are {self.spins} and error is {self.error}')
                 self.update_state()
                 self.set_last_spin_1()
-                self.current_it += 1
                 if self.save_traj:
                     self.traj_spins[self.current_repeat, self.current_it] = self.spins
                     self.traj_error[self.current_repeat, self.current_it] = self.error
+                self.current_it += 1
             self.results[self.current_repeat] = self.spins
             self.current_repeat += 1
 
