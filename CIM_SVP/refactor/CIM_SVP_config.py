@@ -9,8 +9,11 @@ import numpy as np
 # Lattice parameters ---------------------------------------------------------------
 dimension = 2
 latt_numbers = 0
-latt_basis = np.array([[-5, -1],
-                       [-4, -1]])  # read the basis from file
+latt_basis = np.array([[-1, 0, -1, -3, 0],
+                       [7, 0, -11, -7, 9],
+                       [-6, -1, 0, -9, -5],
+                       [-2, 0, -3, -8, 0],
+                       [5, 1, -7, -5, 6]])  # read the basis from file
 latt_int_bounds = None  # Set these from Chris's work
 sitek = 6               # compute this from latt_int_bounds
 qudit_mapping = 'poly'  # ham, poly or bin
@@ -24,7 +27,7 @@ pump_start = -2.
 pump_end = 0.
 tamp_start = 1.
 tamp_end = 2.
-beta = 0.8
+beta = 0.2
 c = 1.
 k = 1.
 
@@ -52,12 +55,13 @@ elif control_system == 'SFC':
 nl_func = 1
 
 # Experimentation parameters -------------------------------------------------------
-time_diff = 0.01
-iters = 3200
-var_iters = 2880
-stat_iters = 320
-repeats = 4
+time_diff = 0.001
+iters = 32000
+var_iters = 28800
+stat_iters = 3200
+repeats = 10
 save_trajectory = False
+write_path = 'results'
 
 # Multiprocessing parameters -------------------------------------------------------
 cores = 4
@@ -84,5 +88,6 @@ pars = {
     'stat_iters': stat_iters,
     'repeats': repeats,
     'save_traj': save_trajectory,
-    'cores': cores
+    'cores': cores,
+    'path': write_path
 }

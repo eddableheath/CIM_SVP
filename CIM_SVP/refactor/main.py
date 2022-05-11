@@ -57,13 +57,13 @@ def main(pars, SVP=True, write=False, plots=False, multiprocessed=False):
                 plt.show()
                 plt.close()
 
-                plt.title(f'Error Trajectory for result {i}')
-                x_axis = np.array(range(experiment.iters)) * experiment.timediff
-                plt.ylim((0, np.max(error_results)))
-                plt.plot(x_axis, error_results)
-                plt.show()
-                plt.close()
-
+                # plt.title(f'Error Trajectory for result {i}')
+                # x_axis = np.array(range(experiment.iters)) * experiment.timediff
+                # plt.ylim((0, np.max(error_results)))
+                # plt.plot(x_axis, error_results)
+                # plt.show()
+                # plt.close()
+                #
                 plt.title(f'Residual Ising Energy Trajectory for result {i}')
                 x_axis = np.array(range(experiment.iters)) * experiment.timediff
                 plt.ylim((0, 2*np.median(ising_energies)))
@@ -84,10 +84,10 @@ def main(pars, SVP=True, write=False, plots=False, multiprocessed=False):
         # print(results)
         results = pd.concat(results)
         print(results)
-        results.to_csv(f'test.csv')
+        results.to_csv(f"{pars['path']}/test.csv")
 
 
 if __name__ == "__main__":
     parameters = config.pars
-    main(parameters, SVP=True, plots=False, multiprocessed=True)
+    main(parameters, SVP=True, plots=True, multiprocessed=False)
 
