@@ -10,18 +10,15 @@ import numpy as np
 np.set_printoptions(edgeitems=10, linewidth=180)
 
 
-def poly_couplings(gramm, sitek):
+def poly_couplings(gramm, qubits_per_qudit):
     """
         Compute the polynomial encodings for the QUBO representation coupling strengths for the CIM.
     :param gramm: gramm matrix defining the problem, integer (m, m)-ndarray
-    :param sitek: integer range to be explored, integer
+    :param qubits_per_qudit: qubits per qudit, int
     :return: - couplings array, float (n, n,)-ndarray
              - identity coefficient, float
     """
     qudits = gramm.shape[0]
-    qubits_per_qudit = int(np.ceil(
-        (np.sqrt(16 * sitek + 1) - 1) / 2
-    ))
     mu = np.ceil(qubits_per_qudit / 2) % 2
     qubits = qudits * qubits_per_qudit + int(1*mu)
     jmat = np.zeros((qubits, qubits))
@@ -51,18 +48,17 @@ def poly_couplings(gramm, sitek):
     return jmat, ic
 
 
-def bin_couplings(gramm, sitek):
+def bin_couplings(gramm, qubits_per_qudit):
     """
         Compute the binary encodings for the QUBO representation coupling strengths for the CIM.
 
         Note: Uses mapping 1 --> -1, 0 --> 1
     :param gramm: gramm matrix defining the problem, integer (m, m)-ndarray
-    :param sitek: integer range to be explored, integer
+    :param qubits_per_qudit: qubits per qudit, int
     :return: - couplings array, float (n, n,)-ndarray
              - identity coefficient, float
     """
     qudits = gramm.shape[0]
-    qubits_per_qudit = int(np.ceil(np.log2(sitek)) + 1)
     qubits = qudits * qubits_per_qudit + 1
     jmat = np.zeros((qubits, qubits))
     ic = 0
@@ -90,16 +86,15 @@ def bin_couplings(gramm, sitek):
     return jmat, ic
 
 
-def ham_couplings(gramm, sitek):
+def ham_couplings(gramm, qubits_per_qudit):
     """
             Compute the binary encodings for the QUBO representation coupling strengths for the CIM.
     :param gramm: gramm matrix defining the problem, integer (m, m)-ndarray
-    :param sitek: integer range to be explored, integer
+    :param qubits_per_qudit: qubits per qudit, int
     :return: - couplings array, float (n, n,)-ndarray
              - identity coefficient, float
         """
     qudits = gramm.shape[0]
-    qubits_per_qudit = 2 * sitek
     qubits = qudits * qubits_per_qudit
     jmat = np.zeros((qubits, qubits))
     ic = 0
@@ -119,16 +114,16 @@ def ham_couplings(gramm, sitek):
     return jmat, ic
 
 
-# Testing
-if __name__ == "__main__":
-    basis = np.array([[1, 1],
-                      [0, 1]])
-    g = basis @ basis.T
-    k = 10
-    print(g)
-    p_ij = poly_couplings(g, k)
-    b_ij = bin_couplings(g, k)
-    h_ij = ham_couplings(g, k)
-    print(p_ij)
-    print(b_ij)
-    print(h_ij)
+# # Testing
+# if __name__ == "__main__":
+#     basis = np.array([[2, 1],
+#                       [0, 1]])
+#     g = basis @ basis.T
+#     k = 10
+#     print(g)
+#     p_ij = poly_couplings(g, k)
+#     b_ij = bin_couplings(g, k)
+#     h_ij = ham_couplings(g, k)
+#     print(p_ij)
+#     print(b_ij)
+#     print(h_ij)

@@ -12,7 +12,7 @@ latt_numbers = 0
 latt_basis = np.array([[1, -1],
                        [0, 1]])  # read the basis from file
 latt_int_bounds = None  # Set these from Chris's work
-sitek = 6               # compute this from latt_int_bounds
+max_qubits = 1000
 qudit_mapping = 'poly'  # ham, poly or bin
 
 # CIM parameters -------------------------------------------------------------------
@@ -71,7 +71,7 @@ cores = 4
 # Pars dict ------------------------------------------------------------------------
 pars = {
     'basis': latt_basis,
-    'sitek': sitek,
+    'max_qubits': max_qubits,
     'qudit_mapping': qudit_mapping,
     'control_sys': control_system,
     'couplings': couplings_matrix,

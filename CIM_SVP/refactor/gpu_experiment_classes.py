@@ -1,15 +1,16 @@
-# Experiment Classes
+# GPU Implementation experiment classes
 # Author: Edmund Dable-Heath
 """
-    Experiment classes for the CIM
+    Replication of the main experiment classes for the GPU implementation.
 """
 
 import numpy as np
 import pandas as pd
+import torch
 import isingify
-from sim_funcs import simulation_step, normalisation_factor, ising_energy
-import construct_basis as cb
-from copy import copy
+from gpu_sim_funcs import simulation_step, ising_energy
+from sim_funcs import normalisation_factor
+import qubit_bounds as qb
 
 
 class CIM:
@@ -22,7 +23,7 @@ class CIM:
         """
             Parameter list:
                 - control_sys: Error control system for CIM, str
-                - couplings: couplings matrix, float-(m, m)-ndarray
+                - couplings: couplings matrix, float-(m, m)-torch.tensor
                 - pump_start: pump parameter start, float
                 - pump_end: final pump param value, float
                 - tamp_start: initial tamp value, float
@@ -83,8 +84,10 @@ class CIM:
         # Experiment params
         self.repeats = pars['repeats']
         self.current_repeat = 0
-        self.spins = np.zeros(self.couplings.shape[0])
-        self.error = np.zeros(self.couplings.shape[0])
+        spins = torch.zeros(self.couplings.shape[0])
+        self.spins = spins.cuda()
+        error = torch.zeros(self.couplings.shape[0])
+        self.error = error.cuda()
         self.results = np.zeros((self.repeats, self.problem_size))
         self.save_traj = pars['save_traj']
         if self.save_traj:
@@ -97,8 +100,9 @@ class CIM:
         """
         self.pump = self.pump_start
         self.tamp = self.tamp_start
-        self.spins = self.rng.normal(0.0, 0.5, self.problem_size)
-        self.error = np.ones(self.problem_size)
+        spins = self.rng.normal(0.0, 0.5, self.problem_size)
+        self.spins = torch.tensor(spins)
+        self.error = torch.ones(self.problem_size)
         self.current_it = 0
 
     def update_state(self):
@@ -149,7 +153,7 @@ class CIM_SVP(CIM):
         """
             Parameter list:
                 - basis: lattice basis for defining problem, int-(m, m)-ndarray
-                - sitek: integer range to search over, int
+                - max_qubits: maximum number of qubits allowed given computation power, int
                 - qudit_mapping: qudit encoding of integers by qubits, str
                 - requires all other parameters included in standard CIM class other than couplings_matrix.
         """
@@ -157,8 +161,15 @@ class CIM_SVP(CIM):
         self.basis = pars['basis']
         self.dim = self.basis.shape[0]
         self.gramm = self.basis @ self.basis.T
-        self.sitek = pars['sitek']
         self.qudit_mapping = pars['qudit_mapping']
+        if self.qudit_mapping == 'bin':
+            self.qubits_per_qudit = qb.bin_bound(self.basis)
+        elif self.qudit_mapping == 'poly':
+            self.qubits_per_qudit = qb.poly_bound(self.basis)
+        elif self.qudit_mapping == 'ham':
+            self.qubits_per_qudit = qb.hamming_bound(self.basis)
+        if self.qubits_per_qudit > pars['max_qubits']:
+            self.qubits_per_qudit = pars['max_qubits']
         self.couplings, self.identity_coeff, self.qubits_per_qudit, self.mu = None, None, None, None
         self.preprocess()
 
@@ -172,18 +183,19 @@ class CIM_SVP(CIM):
             Compute couplings matrix, number of qubits required per encoding as well as identity and mu coefficients.
         """
         if self.qudit_mapping == 'poly':
-            self.couplings, self.identity_coeff = isingify.poly_couplings(self.gramm, self.sitek)
-            self.qubits_per_qudit = int(np.ceil(
-                (np.sqrt(16 * self.sitek + 1) - 1) / 2
-            ))
+            couplings, self.identity_coeff = isingify.poly_couplings(self.gramm, self.qubits_per_qudit)
+            couplings = torch.tensor(couplings)
+            self.couplings = couplings.cuda()
             self.mu = np.ceil(self.qubits_per_qudit / 2) % 2
         elif self.qudit_mapping == 'bin':
-            self.couplings, self.identity_coeff = isingify.bin_couplings(self.gramm, self.sitek)
-            self.qubits_per_qudit = int(np.ceil(np.log2(self.sitek)) + 1)
+            couplings, self.identity_coeff = isingify.bin_couplings(self.gramm, self.qubits_per_qudit)
+            couplings = torch.tensor(couplings)
+            self.couplings = couplings.cuda()
             self.mu = 1
         elif self.qudit_mapping == 'ham':
-            self.couplings, self.identity_coeff = isingify.ham_couplings(self.gramm, self.sitek)
-            self.qubits_per_qudit = 2 * self.sitek
+            couplings, self.identity_coeff = isingify.ham_couplings(self.gramm, self.qubits_per_qudit)
+            couplings = torch.tensor(couplings)
+            self.couplings = couplings.cuda()
             self.mu = 0
 
     def bitstr_to_coeff_vector(self, bitstr):
@@ -234,7 +246,7 @@ class CIM_SVP(CIM):
         """
             Translate back to lattice problem.
         """
-        int_vects = [self.bitstr_to_coeff_vector(np.sign(spins).astype(int))
+        int_vects = [self.bitstr_to_coeff_vector(np.sign(np.asarray(spins)).astype(int))
                      for spins in self.results]
         latt_vects = [np.dot(self.basis.T, vect) for vect in int_vects]
         norms = np.around(np.linalg.norm(latt_vects, axis=1), 3)
@@ -302,97 +314,3 @@ class CIM_SVP(CIM):
             return results
         elif results_type == 'write':
             results.to_csv(f'{path}/{filename}')
-
-
-class CIM_SVP_basis_update(CIM_SVP):
-
-    """
-        CIM SVP solver with basis updating.
-    """
-
-    # Todo: compute sitek based on orthogonality defect bound from albrecht?
-
-    def __init__(self, **pars):
-        CIM_SVP.__init__(self, **pars)
-        if pars['basis_comparison'] == 'mean':
-            self.basis_comp = cb.mean_comp
-        elif pars['basis_comparison'] == 'median':
-            self.basis_comp = cb.med_comp
-        elif pars['basis_comparison'] == 'max':
-            self.basis_comp = cb.max_comp
-        self.bases = []
-        self.bases.append(copy(self.basis))
-        self.search_buffer = 0
-        self.search_buffer_window = pars['search_buffer'] * pars['iters']
-
-    def update_basis(self, new_vector):
-        """
-            If shorter vector than basis vectors is found then update basis and couplings matrix.
-        """
-        prim_vec = cb.check_for_primitivity(new_vector)
-        self.basis = cb.construct_basis(prim_vec, self.basis)
-        self.gramm = self.basis @ self.basis.T
-        self.preprocess()  # updates couplings matrix etc.
-
-    def run(self, results_type='return', filename='test.csv'):
-        """
-            Overrides run from standard CIM SVP solver to include basis updater routine.
-        """
-        for i in range(self.repeats):
-            print(f'resetting experiment, current basis:')
-            print(self.basis)
-            self.reset_exp()
-            self.basis = copy(self.bases[0])
-            print('reset basis:')
-            print(self.basis)
-            self.bases.append(copy(self.basis))
-            self.set_last_spin_1()
-            for j in range(self.iters):
-                self.update_state()
-                self.set_last_spin_1()
-                if self.save_traj:
-                    self.traj_spins[self.current_repeat, self.current_it] = self.spins
-                    self.traj_error[self.current_repeat, self.current_it] = self.error
-                self.current_it += 1
-                if self.search_buffer > self.search_buffer_window:
-                    int_vec = self.bitstr_to_coeff_vector(np.sign(self.spins)).astype(int)
-                    latt_vec = np.dot(self.basis.T, int_vec).astype(int)
-                    if self.basis_comp(self.basis, latt_vec) and np.linalg.norm(latt_vec) > 0:
-                        print(f'new basis vector to be added: {latt_vec} ---------------------------------')
-                        old_basis_det = np.linalg.det(self.basis)
-                        mean_basis_length = np.mean(np.linalg.norm(self.basis, axis=1))
-                        self.update_basis(int_vec)
-                        self.bases.append(copy(self.basis))
-                        self.search_buffer = 0
-                        print(f'length of new vector {np.linalg.norm(latt_vec)}')
-                        print(f'checking bases construction worked')
-                        print(f'original basis det: {np.linalg.det(self.bases[0])}')
-                        print(f'old basis det: {old_basis_det}')
-                        print(f'new basis det: {np.linalg.det(self.basis)}')
-                        print(f'old basis mean length: {mean_basis_length}')
-                        print(f'new basis mean length: {np.mean(np.linalg.norm(self.basis, axis=1))}')
-                        print(f'new basis:')
-                        print(self.basis)
-                        print(f'new couplings:')
-                        print(self.couplings)
-                        print(f'new identity coeff')
-                        print(self.identity_coeff)
-                    else:
-                        self.search_buffer += 1
-                else:
-                    self.search_buffer += 1
-            self.results[self.current_repeat] = self.spins
-            self.current_repeat += 1
-
-        results = self.postprocess()
-        path = '.'
-
-        if results_type == 'return':
-            return results, self.bases
-        elif results_type == 'write':
-            results.to_csv(f'{path}/{filename}')
-
-
-
-
-
