@@ -91,8 +91,12 @@ class CIM:
         self.results = np.zeros((self.repeats, self.problem_size))
         self.save_traj = pars['save_traj']
         if self.save_traj:
-            self.traj_spins = np.zeros((self.repeats, self.iters, self.problem_size))
-            self.traj_error = np.zeros_like(self.traj_spins)
+            save_traj_amount = int(self.iters * pars['save_traj_rate'])
+            # self.traj_spins = np.zeros((self.repeats, self.iters, self.problem_size))
+            # self.traj_error = np.zeros_like(self.traj_spins)
+            self.traj_energy = np.zeros((self.repeats, save_traj_amount))
+            self.traj_samples = self.rng.choice([i for i in range(self.iters)], size=save_traj_amount, replace=False)
+            self.traj_sample_it = 0
 
     def reset_exp(self):
         """
@@ -250,18 +254,16 @@ class CIM_SVP(CIM):
                      for spins in self.results]
         latt_vects = [np.dot(self.basis.T, vect) for vect in int_vects]
         norms = np.around(np.linalg.norm(latt_vects, axis=1), 3)
-        ising_energies = [ising_energy(np.sign(spins), self.couplings) + self.identity_coeff
+        ising_energies = [ising_energy(torch.sign(spins), self.couplings) + self.identity_coeff
                           for spins in self.results]
         if self.save_traj:
-            traj_energies = [ising_energy(np.sign(self.traj_spins[0][i]), self.couplings) + self.identity_coeff
-                             for i in range(self.traj_spins[0].shape[0])]
             df = pd.DataFrame(data=list(zip(
                 np.around(self.results, 2),
                 int_vects,
                 latt_vects,
                 norms,
                 ising_energies,
-                [traj_energies]
+                np.around(self.traj_energy[0], 2)
             )),
                 columns=[
                     'spins',
@@ -296,13 +298,14 @@ class CIM_SVP(CIM):
             self.reset_exp()
             self.set_last_spin_1()
             for j in range(self.iters):
-                # print(f'at iteration {self.current_it} the spins are {self.spins} and error is {self.error}')
                 self.update_state()
                 self.set_last_spin_1()
                 if self.save_traj:
-                    self.traj_spins[self.current_repeat, self.current_it] = self.spins
-                    self.traj_error[self.current_repeat, self.current_it] = self.error
-                    # print(self.traj_spins)
+                    if self.current_it in self.traj_samples:
+                        self.traj_energy[self.current_repeat, self.traj_sample_it] = ising_energy(
+                            torch.sign(self.spins), self.couplings
+                        ) + self.identity_coeff
+                        self.traj_sample_it += 1
                 self.current_it += 1
             self.results[self.current_repeat] = self.spins
             self.current_repeat += 1

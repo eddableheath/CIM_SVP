@@ -58,6 +58,7 @@ var_iters = 288
 stat_iters = 32
 repeats = 1
 save_trajectory = False
+save_trajectory_rate = 0.2
 write_path = 'results'
 
 # For updating basis ---------------------------------------------------------------
@@ -90,6 +91,7 @@ pars = {
     'stat_iters': stat_iters,
     'repeats': repeats,
     'save_traj': save_trajectory,
+    'save_traj_rate': save_trajectory_rate,
     'cores': cores,
     'path': write_path,
     'update_basis': update_basis,
