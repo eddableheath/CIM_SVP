@@ -98,8 +98,8 @@ def ham_couplings(gramm, sitek):
              - identity coefficient, float
         """
     qudits = gramm.shape[0]
-    qubits_per_qudit = 2 * sitek
-    qubits = qudits * qubits_per_qudit
+    qubits_per_qudit = int(2 * sitek)
+    qubits = int(qudits * qubits_per_qudit)
     jmat = np.zeros((qubits, qubits))
     ic = 0
 

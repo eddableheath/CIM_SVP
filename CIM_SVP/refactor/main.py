@@ -17,25 +17,34 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.max_colwidth', 2000)
 
 
-def mp_run(pars):
+def mp_run(pars, i):
     pars['repeats'] = 1
+    pars['seed'] = 12345*i
     experiment = CIM.CIM_SVP(**pars)
     return experiment.run()
 
 
-def main(pars, SVP=True, write=False, plots=False, multiprocessed=False):
+def main(
+        pars, SVP=True, write=False, plots=False, multiprocessed=False, update_basis=False
+):
     if plots:
         pars['save_traj'] = True
     if not multiprocessed:
         if SVP:
-            experiment = CIM.CIM_SVP(**pars)
-            if write:
-                experiment.run(results_type='write')
-                return 1
-            results = experiment.run()
+            if update_basis:
+                pars['update_basis'] = True
+                experiment = CIM.CIM_SVP_basis_update(**pars)
+                results, bases = experiment.run()
+            else:
+                experiment = CIM.CIM_SVP(**pars)
+                if write:
+                    experiment.run(results_type='write')
+                    return 1
+                results = experiment.run()
         else:
             experiment = CIM.CIM(**pars)
             results = experiment.run()
+        print(bases)
         print(results)
         # print(experiment.couplings)
         print(np.linalg.norm(experiment.basis, axis=1))
@@ -44,6 +53,7 @@ def main(pars, SVP=True, write=False, plots=False, multiprocessed=False):
         print(f"max norm found: {max(results['norms'])}")
         if plots:
             for i in range(experiment.repeats):
+                # for basis in bases:
                 spin_results = experiment.traj_spins[i]
                 error_results = experiment.traj_error[i]
                 ising_energies = np.asarray([ising_energy(spin_results[j], experiment.couplings)
@@ -64,11 +74,11 @@ def main(pars, SVP=True, write=False, plots=False, multiprocessed=False):
                 # plt.show()
                 # plt.close()
                 #
-                plt.title(f'Residual Ising Energy Trajectory for result {i}')
-                x_axis = np.array(range(experiment.iters)) * experiment.timediff
-                plt.ylim((0, 2*np.median(ising_energies)))
-                plt.plot(x_axis, ising_energies)
-                plt.show()
+                # plt.title(f'Residual Ising Energy Trajectory for result {i}')
+                # x_axis = np.array(range(experiment.iters)) * experiment.timediff
+                # plt.ylim((0, 2*np.median(ising_energies)))
+                # plt.plot(x_axis, ising_energies)
+                # plt.show()
                 input('press enter to continue...')
 
     else:
@@ -77,17 +87,17 @@ def main(pars, SVP=True, write=False, plots=False, multiprocessed=False):
         results = [
             pool.apply(
                 mp_run,
-                args=(pars,)
+                args=(pars, i)
             )
-            for _ in range(pars['repeats'])
+            for i in range(pars['repeats'])
         ]
         # print(results)
         results = pd.concat(results)
-        print(results)
+        # print(results)
         results.to_csv(f"{pars['path']}/test.csv")
 
 
 if __name__ == "__main__":
     parameters = config.pars
-    main(parameters, SVP=True, plots=True, multiprocessed=False)
+    main(parameters, SVP=True, update_basis=True, plots=True, multiprocessed=True)
 

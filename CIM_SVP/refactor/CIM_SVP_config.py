@@ -9,11 +9,8 @@ import numpy as np
 # Lattice parameters ---------------------------------------------------------------
 dimension = 2
 latt_numbers = 0
-latt_basis = np.array([[-1, 0, -1, -3, 0],
-                       [7, 0, -11, -7, 9],
-                       [-6, -1, 0, -9, -5],
-                       [-2, 0, -3, -8, 0],
-                       [5, 1, -7, -5, 6]])  # read the basis from file
+latt_basis = np.array([[1, -1],
+                       [0, 1]])  # read the basis from file
 latt_int_bounds = None  # Set these from Chris's work
 sitek = 6               # compute this from latt_int_bounds
 qudit_mapping = 'poly'  # ham, poly or bin
@@ -56,12 +53,17 @@ nl_func = 1
 
 # Experimentation parameters -------------------------------------------------------
 time_diff = 0.001
-iters = 32000
-var_iters = 28800
-stat_iters = 3200
-repeats = 10
+iters = 320
+var_iters = 288
+stat_iters = 32
+repeats = 1
 save_trajectory = False
 write_path = 'results'
+
+# For updating basis ---------------------------------------------------------------
+update_basis = False
+basis_comparison = 'mean'
+initial_search_buffer = 0.1
 
 # Multiprocessing parameters -------------------------------------------------------
 cores = 4
@@ -89,5 +91,8 @@ pars = {
     'repeats': repeats,
     'save_traj': save_trajectory,
     'cores': cores,
-    'path': write_path
+    'path': write_path,
+    'update_basis': update_basis,
+    'basis_comparison': basis_comparison,
+    'search_buffer': initial_search_buffer
 }
